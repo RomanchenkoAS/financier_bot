@@ -1,0 +1,33 @@
+[project]
+name = "financier-bot"
+version = "0.1.0"
+description = "Telegram expense bot with FastAPI backend and Google Sheets integration"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Artur", email = "romanchenkoas@yandex.ru" }
+]
+license = { text = "MIT" }
+
+dependencies = [
+  "fastapi>=0.111.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.7.0",
+  "pydantic-settings>=2.3.0",
+  "httpx>=0.27.0",
+  "loguru>=0.7.2",
+  "aiogram>=3.4.1",
+  "gspread>=6.0.0",
+  "google-auth>=2.30.0",
+  "tenacity>=8.3.0"
+]
+
+[project.scripts]
+financier-api = "financier_bot.main:run"
+financier-bot = "financier_bot.telegram.bot:run"
+
+[tool.uv]
+# uv uses standard PEP 621 metadata; no special config required
+
+[tool.black]
+line-length = 100
