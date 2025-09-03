@@ -23,11 +23,11 @@ dependencies = [
 ]
 
 [project.scripts]
-financier-api = "financier_bot.main:run"
-financier-bot = "financier_bot.telegram.bot:run"
+financier-bot = "src.telegram.bot:run"
 
 [tool.uv]
 # uv uses standard PEP 621 metadata; no special config required
+package = true
 
 [tool.black]
 line-length = 100

@@ -13,5 +13,13 @@ class Settings(BaseSettings):
     google_spreadsheet_id: str | None = None
     google_worksheet_name: str = "Expenses"
 
+    # Access control
+    allowed_chat_id: int | None = None
+
+    # Bot Backend
+    bot_backend_host: str | None = None
+    bot_backend_port: int | None = None
+    bot_backend_database_url: SecretStr | None = None
+
 
 settings = Settings()
