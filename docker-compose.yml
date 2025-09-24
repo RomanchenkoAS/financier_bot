@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  financier-bot:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./.env:/app/.env:ro
