@@ -2,10 +2,10 @@ import os
 import sys
 from datetime import datetime
 
+from dotenv import load_dotenv
 from loguru import logger
 
 from src.services.sheets import client_from_inline_json
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -13,7 +13,8 @@ load_dotenv()
 def main() -> int:
     service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     spreadsheet_id = os.getenv("GOOGLE_SPREADSHEET_ID")
-    worksheet_name = os.getenv("GOOGLE_WORKSHEET_NAME", "Expenses")
+    worksheet_name = os.getenv("GOOGLE_WORKSHEET_NAME")
+    worksheet_config_name = os.getenv("GOOGLE_WORKSHEET_NAME_SERVICE")
 
     if not spreadsheet_id:
         logger.error("Missing required env var: GOOGLE_SPREADSHEET_ID")

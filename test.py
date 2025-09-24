@@ -1,7 +1,8 @@
-import pytest
 import asyncio
 from datetime import datetime
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.telegram.bot import Chat
 
@@ -18,7 +19,7 @@ class TestChatParsing:
     async def test_basic_message(self, chat):
         """Test basic message with amount and category only"""
         result = await chat._parse_message("450 кофе")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == ""
@@ -28,7 +29,7 @@ class TestChatParsing:
     async def test_message_with_comment_double_quotes(self, chat):
         """Test message with comment in double quotes"""
         result = await chat._parse_message('500 Транспорт "Такси"')
-        
+
         assert result["amount"] == 500.0
         assert result["category"] == "Транспорт"
         assert result["comment"] == "Такси"
@@ -38,7 +39,7 @@ class TestChatParsing:
     async def test_message_with_comment_single_quotes(self, chat):
         """Test message with comment in single quotes"""
         result = await chat._parse_message("500 Транспорт 'Такси'")
-        
+
         assert result["amount"] == 500.0
         assert result["category"] == "Транспорт"
         assert result["comment"] == "Такси"
@@ -48,7 +49,7 @@ class TestChatParsing:
     async def test_message_with_comment_backticks(self, chat):
         """Test message with comment in backticks"""
         result = await chat._parse_message("500 Транспорт `Такси`")
-        
+
         assert result["amount"] == 500.0
         assert result["category"] == "Транспорт"
         assert result["comment"] == "Такси"
@@ -58,7 +59,7 @@ class TestChatParsing:
     async def test_message_with_comment_angle_brackets(self, chat):
         """Test message with comment in angle brackets"""
         result = await chat._parse_message("500 Транспорт <Такси>")
-        
+
         assert result["amount"] == 500.0
         assert result["category"] == "Транспорт"
         assert result["comment"] == "Такси"
@@ -68,7 +69,7 @@ class TestChatParsing:
     async def test_message_with_date_dots(self, chat):
         """Test message with date in format DD.MM.YY"""
         result = await chat._parse_message("450 кофе 01.09.25")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == ""
@@ -78,7 +79,7 @@ class TestChatParsing:
     async def test_message_with_date_slashes(self, chat):
         """Test message with date in format DD/MM/YY"""
         result = await chat._parse_message("450 кофе 01/09/25")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == ""
@@ -88,7 +89,7 @@ class TestChatParsing:
     async def test_message_with_date_hyphens(self, chat):
         """Test message with date in format DD-MM-YY"""
         result = await chat._parse_message("450 кофе 01-09-25")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == ""
@@ -98,11 +99,11 @@ class TestChatParsing:
     async def test_message_with_short_date(self, chat):
         """Test message with short date format DD.MM"""
         result = await chat._parse_message("450 кофе 01.09")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == ""
-        
+
         # Should use current year
         current_year = datetime.now().year
         assert result["date"] == f"{current_year}-09-01"
@@ -111,7 +112,7 @@ class TestChatParsing:
     async def test_message_with_date_and_comment(self, chat):
         """Test message with both date and comment"""
         result = await chat._parse_message('450 кофе 01.09.25 "С коллегой"')
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == "С коллегой"
@@ -121,7 +122,7 @@ class TestChatParsing:
     async def test_message_with_comment_and_date(self, chat):
         """Test message with comment first, then date"""
         result = await chat._parse_message('450 кофе "С коллегой" 01.09.25')
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе"
         assert result["comment"] == "С коллегой"
@@ -131,7 +132,7 @@ class TestChatParsing:
     async def test_multi_word_category(self, chat):
         """Test message with multi-word category"""
         result = await chat._parse_message("450 кофе с молоком")
-        
+
         assert result["amount"] == 450.0
         assert result["category"] == "кофе с молоком"
         assert result["comment"] == ""

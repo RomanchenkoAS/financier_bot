@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     # Google Sheets
     google_service_account_json: SecretStr | None = None  # inline JSON string
     google_spreadsheet_id: str | None = None
-    google_worksheet_name: str = "Expenses"
+    google_worksheet_name: str = "data"
+    google_worksheet_name_service: str = "service"
 
     # Access control
     allowed_chat_id: int | None = None
