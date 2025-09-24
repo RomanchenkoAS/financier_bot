@@ -12,6 +12,12 @@ uv sync
 uv run python -m src.telegram.bot
 ```
 
+- if you need hot reload
+
+```bash
+uv run watchfiles "uv run python -m src.telegram.bot" src/
+```
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill values:

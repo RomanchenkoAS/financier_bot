@@ -54,3 +54,48 @@ def append_expense(
         expense["comment"],
     ]
     data_ws.insert_row(row, index=first_data_row, value_input_option="USER_ENTERED")
+
+
+def get_recent_expenses(limit: int = 9) -> list[dict[str, Any]]:
+    """Get recent expenses from the data sheet."""
+    if not settings.google_service_account_json or not settings.google_spreadsheet_id:
+        raise RuntimeError("Google Sheets settings are not configured")
+
+    client = client_from_inline_json(settings.google_service_account_json.get_secret_value())
+    sh = client.open_by_key(settings.google_spreadsheet_id)
+    data_ws = sh.worksheet("data")
+    service_ws = sh.worksheet("service")
+
+    # Get the first data row from service sheet
+    first_row_str = service_ws.acell("B2").value
+    if not first_row_str:
+        raise ValueError("service!B2 is empty; cannot determine first data row")
+    try:
+        first_data_row = int(first_row_str)
+    except ValueError as exc:
+        raise ValueError(f"Invalid first data row in service!B2: {first_row_str}") from exc
+
+    # Get data from first_data_row to first_data_row + limit
+    end_row = first_data_row + limit - 1
+    range_name = f"A{first_data_row}:D{end_row}"
+    
+    try:
+        values = data_ws.get(range_name)
+        expenses = []
+        for row in values:
+            date = str(row[0]).strip() if row[0] else ""
+            category = str(row[1]).strip() if row[1] else ""
+            amount = str(row[2]).strip() if row[2] else ""
+            comment = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+
+            expenses.append(
+                {
+                    "date": date,
+                    "category": category,
+                    "amount": amount,
+                    "comment": comment,
+                }
+            )
+        return expenses
+    except Exception as exc:
+        raise ValueError(f"Failed to get recent expenses: {exc}") from exc

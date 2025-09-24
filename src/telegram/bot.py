@@ -4,12 +4,13 @@ from datetime import datetime
 from typing import Any
 
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from loguru import logger
 
 from src.config import settings
-from src.services.sheets import append_expense
+from src.services.sheets import append_expense, get_recent_expenses
+from src.telegram.utils import format_expense_for_display, get_example_formats
 
 
 class Chat:
@@ -122,8 +123,58 @@ async def _main() -> None:
             return
         await chat.respond(
             f"Привет! Твой chat_id: {chat.chat_id}.\n"
-            "Пришли сумму и описание: например, '450 кофе'."
+            "Пришли сумму и описание: например, '450 кофе'.\n\n"
+            "Доступные команды:\n"
+            "/example - показать примеры ввода\n"
+            "/recent - показать последние 10 трат\n"
+            "/stats - статистика (заглушка)"
         )
+
+    @dp.message(Command("example"))
+    @dp.message(Command("examples"))
+    async def on_example(msg: Message) -> None:
+        chat = Chat(msg)
+        if not chat._is_allowed():
+            return
+
+        examples = get_example_formats()
+        response = "📝 Примеры форматов ввода:\n\n"
+        for example in examples:
+            response += f"{example}\n"
+
+        await chat.respond(response)
+
+    @dp.message(Command("recent"))
+    async def on_recent(msg: Message) -> None:
+        chat = Chat(msg)
+        if not chat._is_allowed():
+            return
+
+        try:
+            # Get recent expenses from Google Sheets
+            expenses = get_recent_expenses()
+
+            if not expenses:
+                await chat.respond("📊 Нет данных о тратах")
+                return
+
+            response = "📊 Последние траты:\n\n"
+            for i, expense in enumerate(expenses, 1):
+                response += f"{format_expense_for_display(expense, i)}\n"
+
+            await chat.respond(response)
+
+        except Exception as e:
+            logger.error(f"Failed to get recent expenses: {e}")
+            await chat.respond(f"❌ Ошибка при получении данных: {str(e)}")
+
+    @dp.message(Command("stats"))
+    async def on_stats(msg: Message) -> None:
+        chat = Chat(msg)
+        if not chat._is_allowed():
+            return
+
+        await chat.respond("📈 Статистика (заглушка)\n\nЭта функция будет реализована позже")
 
     @dp.message()
     async def on_message(msg: Message) -> None:
