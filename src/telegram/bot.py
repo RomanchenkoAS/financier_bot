@@ -9,8 +9,8 @@ from aiogram.types import Message
 from loguru import logger
 
 from src.config import settings
-from src.services.sheets import append_expense, get_recent_expenses
-from src.telegram.utils import format_expense_for_display, get_example_formats
+from src.services.sheets import append_expense, get_recent_expenses, get_current_month_expenses
+from src.telegram.utils import format_expense_for_display, get_example_formats, format_stats
 
 
 class Chat:
@@ -127,7 +127,7 @@ async def _main() -> None:
             "Доступные команды:\n"
             "/example - показать примеры ввода\n"
             "/recent - показать последние 10 трат\n"
-            "/stats - статистика (заглушка)"
+            "/stats - статистика за текущий месяц"
         )
 
     @dp.message(Command("example"))
@@ -174,7 +174,13 @@ async def _main() -> None:
         if not chat._is_allowed():
             return
 
-        await chat.respond("📈 Статистика (заглушка)\n\nЭта функция будет реализована позже")
+        try:
+            expenses = get_current_month_expenses()
+            response = format_stats(expenses)
+            await chat.respond(response)
+        except Exception as e:
+            logger.error(f"Failed to get stats: {e}")
+            await chat.respond(f"❌ Ошибка при получении статистики: {str(e)}")
 
     @dp.message()
     async def on_message(msg: Message) -> None:
