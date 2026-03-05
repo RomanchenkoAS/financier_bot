@@ -275,7 +275,7 @@ async def _main() -> None:
 
         host = settings.bot_backend_host or "0.0.0.0"
         port = settings.bot_backend_port or 8000
-        config = uvicorn.Config(webapp, host=host, port=port, log_level="info")
+        config = uvicorn.Config(webapp, host=host, port=port, log_level="info", access_log=False)
         server = uvicorn.Server(config)
         tasks.append(server.serve())
         logger.info(f"Starting webapp on {host}:{port}")

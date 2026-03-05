@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import time
 from collections import defaultdict
 from urllib.parse import parse_qsl
 
@@ -14,7 +15,7 @@ from loguru import logger
 from src.config import settings
 from src.services.sheets import get_current_month_expenses
 
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,6 +50,21 @@ def validate_init_data(init_data: str) -> dict:
 
     if not hmac.compare_digest(computed_hash, received_hash):
         raise ValueError("Invalid hash")
+
+    auth_date_raw = parsed.get("auth_date")
+    if not auth_date_raw:
+        raise ValueError("Missing auth_date")
+    try:
+        auth_date = int(auth_date_raw)
+    except ValueError as exc:
+        raise ValueError("Invalid auth_date") from exc
+
+    now = int(time.time())
+    max_age = max(1, settings.webapp_init_data_max_age_seconds)
+    if auth_date > now + 30:
+        raise ValueError("Invalid auth_date")
+    if now - auth_date > max_age:
+        raise ValueError("Expired init data")
 
     if settings.allowed_chat_id and "user" in parsed:
         user_data = json.loads(parsed["user"])

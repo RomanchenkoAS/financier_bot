@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # Webapp (Telegram Mini App)
     webapp_url: str | None = None  # public HTTPS URL for the Mini App
+    webapp_init_data_max_age_seconds: int = 300
 
     # Bot Backend
     bot_backend_host: str | None = None

@@ -26,6 +26,7 @@ Copy `.env.example` to `.env` and fill values:
 TELEGRAM_BOT_TOKEN=xxxxx
 ALLOWED_CHAT_ID=123456789
 WEBAPP_URL=https://your-public-domain.example
+WEBAPP_INIT_DATA_MAX_AGE_SECONDS=300
 BOT_BACKEND_HOST=0.0.0.0
 BOT_BACKEND_PORT=8000
 GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account", ...}

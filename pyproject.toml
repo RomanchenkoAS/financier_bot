@@ -10,11 +10,15 @@ authors = [
 license = { text = "MIT" }
 
 dependencies = [
-  "fastapi>=0.111.0",
+  "fastapi>=0.121.0",
+  "starlette>=0.49.1",
   "uvicorn[standard]>=0.30.0",
   "pydantic>=2.7.0",
   "pydantic-settings>=2.3.0",
   "httpx>=0.27.0",
+  "aiohttp>=3.13.3",
+  "urllib3>=2.6.3",
+  "pyasn1>=0.6.2",
   "loguru>=0.7.2",
   "aiogram>=3.4.1",
   "gspread>=6.0.0",
