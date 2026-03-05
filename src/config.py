@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Access control
     allowed_chat_id: int | None = None
 
+    # Webapp (Telegram Mini App)
+    webapp_url: str | None = None  # public HTTPS URL for the Mini App
+
     # Bot Backend
     bot_backend_host: str | None = None
     bot_backend_port: int | None = None

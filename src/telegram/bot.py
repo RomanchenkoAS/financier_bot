@@ -5,7 +5,13 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    WebAppInfo,
+    MenuButtonWebApp,
+)
 from loguru import logger
 
 from src.config import settings
@@ -22,8 +28,8 @@ class Chat:
         allowed = settings.allowed_chat_id
         return allowed is None or self.chat_id == allowed
 
-    async def respond(self, text: str) -> None:
-        await self.bot.send_message(self.chat_id, text)
+    async def respond(self, text: str, **kwargs) -> None:
+        await self.bot.send_message(self.chat_id, text, **kwargs)
 
     async def _parse_message(self, message: str) -> dict[str, Any]:
         """
@@ -114,6 +120,35 @@ async def _main() -> None:
     bot = Bot(token=token)
     dp = Dispatcher()
 
+    if settings.webapp_url:
+        try:
+            menu_button = MenuButtonWebApp(
+                text="Статистика",
+                web_app=WebAppInfo(url=settings.webapp_url),
+            )
+            if settings.allowed_chat_id:
+                await bot.set_chat_menu_button(
+                    chat_id=settings.allowed_chat_id,
+                    menu_button=menu_button,
+                )
+            else:
+                await bot.set_chat_menu_button(menu_button=menu_button)
+            logger.info("Mini App menu button configured")
+        except Exception as e:
+            logger.warning(f"Failed to configure Mini App menu button: {e}")
+
+    def mini_app_markup() -> InlineKeyboardMarkup | None:
+        if not settings.webapp_url:
+            return None
+        return InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="📊 Открыть Mini App",
+                    web_app=WebAppInfo(url=settings.webapp_url),
+                )
+            ]]
+        )
+
     @dp.message(CommandStart())
     async def on_start(msg: Message) -> None:
         chat = Chat(msg)
@@ -127,7 +162,8 @@ async def _main() -> None:
             "Доступные команды:\n"
             "/example - показать примеры ввода\n"
             "/recent - показать последние 10 трат\n"
-            "/stats - статистика за текущий месяц"
+            "/stats - статистика за текущий месяц\n"
+            "/app - открыть Mini App с диаграммой"
         )
 
     @dp.message(Command("example"))
@@ -177,10 +213,27 @@ async def _main() -> None:
         try:
             expenses = get_current_month_expenses()
             response = format_stats(expenses)
-            await chat.respond(response)
+            kwargs = {}
+            markup = mini_app_markup()
+            if markup:
+                kwargs["reply_markup"] = markup
+            await chat.respond(response, **kwargs)
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
             await chat.respond(f"❌ Ошибка при получении статистики: {str(e)}")
+
+    @dp.message(Command("app"))
+    async def on_app(msg: Message) -> None:
+        chat = Chat(msg)
+        if not chat._is_allowed():
+            return
+
+        markup = mini_app_markup()
+        if not markup:
+            await chat.respond("Mini App не настроен. Укажи WEBAPP_URL (HTTPS).")
+            return
+
+        await chat.respond("Открой статистику в Mini App:", reply_markup=markup)
 
     @dp.message()
     async def on_message(msg: Message) -> None:
@@ -213,8 +266,23 @@ async def _main() -> None:
         except ValueError as e:
             await chat.respond(f"❌ Error: {str(e)}")
 
+    tasks = []
+
+    # Start webapp server if configured
+    if settings.webapp_url:
+        import uvicorn
+        from src.webapp import app as webapp
+
+        host = settings.bot_backend_host or "0.0.0.0"
+        port = settings.bot_backend_port or 8000
+        config = uvicorn.Config(webapp, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        tasks.append(server.serve())
+        logger.info(f"Starting webapp on {host}:{port}")
+
     logger.info("Starting Telegram bot polling")
-    await dp.start_polling(bot)
+    tasks.append(dp.start_polling(bot))
+    await asyncio.gather(*tasks)
 
 
 def run() -> None:

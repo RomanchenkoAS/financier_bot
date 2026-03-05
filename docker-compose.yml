@@ -4,5 +4,7 @@ services:
   financier-bot:
     build: .
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     volumes:
       - ./.env:/app/.env:ro
