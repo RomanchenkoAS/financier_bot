@@ -104,6 +104,15 @@ def get_recent_expenses(limit: int = 9) -> list[dict[str, Any]]:
 
 def get_current_month_expenses() -> list[dict[str, Any]]:
     """Get all expenses for the current month from the data sheet."""
+    now = datetime.now()
+    return get_month_expenses(now.year, now.month)
+
+
+def get_month_expenses(target_year: int, target_month: int) -> list[dict[str, Any]]:
+    """Get all expenses for a specific month from the data sheet."""
+    if target_month < 1 or target_month > 12:
+        raise ValueError("Month must be between 1 and 12")
+
     if not settings.google_service_account_json or not settings.google_spreadsheet_id:
         raise RuntimeError("Google Sheets settings are not configured")
 
@@ -127,9 +136,6 @@ def get_current_month_expenses() -> list[dict[str, Any]]:
     
     try:
         values = data_ws.get(range_name)
-        current_month = datetime.now().month
-        current_year = datetime.now().year
-        
         expenses = []
         for row in values:
             if not row or len(row) < 3:
@@ -150,8 +156,8 @@ def get_current_month_expenses() -> list[dict[str, Any]]:
                         if year < 100:
                             year += 2000
                         
-                        # Filter by current month and year
-                        if month == current_month and year == current_year:
+                        # Filter by requested month and year
+                        if month == target_month and year == target_year:
                             try:
                                 amount = float(amount_str)
                                 expenses.append(
@@ -169,4 +175,4 @@ def get_current_month_expenses() -> list[dict[str, Any]]:
                 
         return expenses
     except Exception as exc:
-        raise ValueError(f"Failed to get current month expenses: {exc}") from exc
+        raise ValueError(f"Failed to get month expenses: {exc}") from exc

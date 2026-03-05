@@ -5,6 +5,7 @@ import hmac
 import json
 import time
 from collections import defaultdict
+from datetime import datetime
 from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, HTTPException, Query
@@ -13,7 +14,7 @@ from fastapi.responses import HTMLResponse
 from loguru import logger
 
 from src.config import settings
-from src.services.sheets import get_current_month_expenses
+from src.services.sheets import get_month_expenses
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -80,15 +81,27 @@ def validate_init_data(init_data: str) -> dict:
 
 
 @app.get("/api/stats")
-async def api_stats(initData: str = Query(...)):
+async def api_stats(
+    initData: str = Query(...),
+    year: int | None = Query(default=None),
+    month: int | None = Query(default=None),
+):
     try:
         validate_init_data(initData)
     except ValueError as e:
         logger.warning(f"Mini App auth failed: {e}")
         raise HTTPException(status_code=403, detail=str(e))
 
+    now = datetime.now()
+    target_year = year or now.year
+    target_month = month or now.month
+    if target_month < 1 or target_month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    if target_year < 2000 or target_year > 2100:
+        raise HTTPException(status_code=400, detail="Invalid year")
+
     try:
-        expenses = get_current_month_expenses()
+        expenses = get_month_expenses(target_year, target_month)
     except Exception as e:
         logger.error(f"Failed to get expenses: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch expenses")
@@ -106,6 +119,8 @@ async def api_stats(initData: str = Query(...)):
     return {
         "categories": [{"name": n, "amount": a} for n, a in sorted_categories],
         "total": total,
+        "year": target_year,
+        "month": target_month,
     }
 
 
@@ -138,6 +153,21 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 .header{text-align:center;margin-bottom:20px}
+.month-nav{
+  display:flex;align-items:center;justify-content:center;
+  gap:12px;margin-bottom:8px;
+}
+.nav-btn{
+  border:0;background:var(--tg-theme-secondary-bg-color,#f4f4f4);
+  color:var(--tg-theme-text-color,#000);
+  width:30px;height:30px;border-radius:15px;
+  font-size:18px;line-height:30px;cursor:pointer;
+}
+.nav-title{
+  min-width:150px;text-align:center;
+  font-size:13px;color:var(--tg-theme-hint-color,#999);
+  text-transform:uppercase;letter-spacing:.5px;
+}
 .month{font-size:13px;color:var(--tg-theme-hint-color,#999);text-transform:uppercase;letter-spacing:.5px}
 .total{font-size:34px;font-weight:700;margin-top:2px}
 .chart-wrap{position:relative;max-width:280px;margin:0 auto 28px}
@@ -174,91 +204,130 @@ tg.ready();
 tg.expand();
 
 function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
+const state = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+};
 
-async function load(){
-  const app = document.getElementById('app');
+function shiftMonth(delta){
+  let m = state.month + delta;
+  let y = state.year;
+  if(m < 1){
+    m = 12;
+    y -= 1;
+  }else if(m > 12){
+    m = 1;
+    y += 1;
+  }
+  state.year = y;
+  state.month = m;
+}
+
+async function fetchStats(){
   const initData = tg.initData;
-  if(!initData){
-    app.innerHTML='<div class="error">Откройте через Telegram</div>';
-    return;
+  if(!initData) throw new Error('Откройте через Telegram');
+  const params = new URLSearchParams({
+    initData: initData,
+    year: String(state.year),
+    month: String(state.month),
+  });
+  const r = await fetch('/api/stats?'+params.toString());
+  if(!r.ok){
+    let detail = r.statusText;
+    try{
+      const err = await r.json();
+      if(err && err.detail){
+        detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+      }
+    }catch(_){}
+    throw new Error(detail);
   }
-  try{
-    const r = await fetch('/api/stats?initData='+encodeURIComponent(initData));
-    if(!r.ok){
-      let detail = r.statusText;
-      try{
-        const err = await r.json();
-        if(err && err.detail){
-          detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
-        }
-      }catch(_){}
-      throw new Error(detail);
-    }
-    const data = await r.json();
-    render(data);
-  }catch(e){
-    app.innerHTML='<div class="error">Ошибка загрузки: '+e.message+'</div>';
-  }
+  return r.json();
 }
 
 function render(data){
   const app = document.getElementById('app');
-  if(!data.categories||!data.categories.length){
-    app.innerHTML='<div class="empty">Нет данных за текущий месяц</div>';
-    return;
-  }
-  const now = new Date();
-  const monthName = MONTHS[now.getMonth()];
-  const total = data.total;
-  const cats = data.categories;
+  const total = data.total || 0;
+  const cats = data.categories || [];
+  const monthLabel = MONTHS[state.month - 1] + ' ' + state.year;
 
   let html = '<div class="header">';
-  html += '<div class="month">'+monthName+' '+now.getFullYear()+'</div>';
+  html += '<div class="month-nav">';
+  html += '<button id="prev-month" class="nav-btn" type="button">&#8249;</button>';
+  html += '<div class="nav-title">'+monthLabel+'</div>';
+  html += '<button id="next-month" class="nav-btn" type="button">&#8250;</button>';
+  html += '</div>';
   html += '<div class="total">'+fmt(total)+'</div>';
   html += '</div>';
-  html += '<div class="chart-wrap"><canvas id="chart"></canvas></div>';
-  html += '<ul class="legend">';
-  cats.forEach(function(c,i){
-    const color = COLORS[i % COLORS.length];
-    const pct = total > 0 ? (c.amount/total*100).toFixed(1) : '0.0';
-    html += '<li class="legend-item">';
-    html += '<span class="dot" style="background:'+color+'"></span>';
-    html += '<span class="name">'+c.name+'</span>';
-    html += '<span class="amount">'+fmt(c.amount)+'</span>';
-    html += '<span class="pct">'+pct+'%</span>';
-    html += '</li>';
-  });
-  html += '</ul>';
-  app.innerHTML = html;
 
-  const ctx = document.getElementById('chart').getContext('2d');
-  new Chart(ctx,{
-    type:'doughnut',
-    data:{
-      labels: cats.map(function(c){return c.name}),
-      datasets:[{
-        data: cats.map(function(c){return c.amount}),
-        backgroundColor: cats.map(function(_,i){return COLORS[i%COLORS.length]}),
-        borderWidth: 2,
-        borderColor: getComputedStyle(document.body).getPropertyValue('--tg-theme-bg-color')||'#fff',
-        hoverOffset: 6,
-      }]
-    },
-    options:{
-      cutout:'62%',
-      responsive:true,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            label:function(ctx){
-              return ctx.label+': '+fmt(ctx.raw);
+  if(!cats.length){
+    html += '<div class="empty">Нет данных за выбранный месяц</div>';
+    app.innerHTML = html;
+  }else{
+    html += '<div class="chart-wrap"><canvas id="chart"></canvas></div>';
+    html += '<ul class="legend">';
+    cats.forEach(function(c,i){
+      const color = COLORS[i % COLORS.length];
+      const pct = total > 0 ? (c.amount/total*100).toFixed(1) : '0.0';
+      html += '<li class="legend-item">';
+      html += '<span class="dot" style="background:'+color+'"></span>';
+      html += '<span class="name">'+c.name+'</span>';
+      html += '<span class="amount">'+fmt(c.amount)+'</span>';
+      html += '<span class="pct">'+pct+'%</span>';
+      html += '</li>';
+    });
+    html += '</ul>';
+    app.innerHTML = html;
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    new Chart(ctx,{
+      type:'doughnut',
+      data:{
+        labels: cats.map(function(c){return c.name}),
+        datasets:[{
+          data: cats.map(function(c){return c.amount}),
+          backgroundColor: cats.map(function(_,i){return COLORS[i%COLORS.length]}),
+          borderWidth: 2,
+          borderColor: getComputedStyle(document.body).getPropertyValue('--tg-theme-bg-color')||'#fff',
+          hoverOffset: 6,
+        }]
+      },
+      options:{
+        cutout:'62%',
+        responsive:true,
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            callbacks:{
+              label:function(ctx){
+                return ctx.label+': '+fmt(ctx.raw);
+              }
             }
           }
         }
       }
-    }
+    });
+  }
+
+  document.getElementById('prev-month').addEventListener('click', async function(){
+    shiftMonth(-1);
+    await load();
   });
+  document.getElementById('next-month').addEventListener('click', async function(){
+    shiftMonth(1);
+    await load();
+  });
+}
+
+async function load(){
+  const app = document.getElementById('app');
+  app.innerHTML='<div class="loading">Загрузка…</div>';
+  try{
+    const data = await fetchStats();
+    render(data);
+  }catch(e){
+    app.innerHTML='<div class="error">Ошибка загрузки: '+e.message+'</div>';
+  }
 }
 
 load();
