@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 from collections import defaultdict
-from urllib.parse import unquote
+from urllib.parse import parse_qsl
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +35,7 @@ def validate_init_data(init_data: str) -> dict:
         raise ValueError("Bot token not configured")
 
     token = settings.telegram_bot_token.get_secret_value()
-    parsed = dict(pair.split("=", 1) for pair in init_data.split("&") if "=" in pair)
+    parsed = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = parsed.pop("hash", None)
     if not received_hash:
         raise ValueError("Missing hash")
@@ -51,7 +51,7 @@ def validate_init_data(init_data: str) -> dict:
         raise ValueError("Invalid hash")
 
     if settings.allowed_chat_id and "user" in parsed:
-        user_data = json.loads(unquote(parsed["user"]))
+        user_data = json.loads(parsed["user"])
         if user_data.get("id") != settings.allowed_chat_id:
             raise ValueError("Access denied")
 
@@ -68,6 +68,7 @@ async def api_stats(initData: str = Query(...)):
     try:
         validate_init_data(initData)
     except ValueError as e:
+        logger.warning(f"Mini App auth failed: {e}")
         raise HTTPException(status_code=403, detail=str(e))
 
     try:
@@ -167,7 +168,16 @@ async function load(){
   }
   try{
     const r = await fetch('/api/stats?initData='+encodeURIComponent(initData));
-    if(!r.ok) throw new Error(r.statusText);
+    if(!r.ok){
+      let detail = r.statusText;
+      try{
+        const err = await r.json();
+        if(err && err.detail){
+          detail = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+        }
+      }catch(_){}
+      throw new Error(detail);
+    }
     const data = await r.json();
     render(data);
   }catch(e){
